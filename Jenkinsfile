@@ -3,6 +3,7 @@ pipeline {
   
   environment {                
          SONAR_HOME =  tool name: 'sonar-scanner'
+         IDCONTAINER = ''
     }
 
   stages {
@@ -27,7 +28,7 @@ pipeline {
         }
       }
     }
-   stage('Dependency Check') {
+  stage('Dependency Check') {
     steps {
         dependencyCheck additionalArguments: ''' 
             -o "./" 
@@ -51,6 +52,54 @@ pipeline {
                 }
             }
         }
+        
+    stage('Docker Build') {
+      agent any
+        steps {
+            sh 'sudo docker build -t sec/test-dinamic:latest .'
+        }
+    }
+    stage('Up Docker Image') {
+      agent any
+        steps {
+            
+            sh 'sudo docker run -d --name sec-scan -p 3000:3000 sec/test-dinamic'
+        }
+    }
+    
+        
+        stage('Scan OWASP ZAP App container') {
+             steps {
+                 script {
+                         echo "Pulling up last OWASP ZAP container --> Start"
+                         sh 'sudo docker pull owasp/zap2docker-stable'
+                         echo "Pulling up last VMS container --> End"
+                         echo "Starting container --> Start"
+                         
+                         
+                         sh """
+                                sudo docker run -dt --name owasp-scan \
+                                owasp/zap2docker-stable  /bin/bash 
+                              
+                            """
+                       
+                            
+                         sh 'sudo docker exec owasp-scan mkdir /zap/wrk'
+                         
+						 sh """
+                            sudo docker exec owasp-scan zap-baseline.py \
+                            -t http://192.168.100.115:3000/ \
+                            -x report-zap.xml -I &&
+                            myvar=\$(sudo docker ps -aqf 'name=owasp-scan') 
+                            echo export myvar 
+                            sudo docker cp \$myvar:/zap/wrk/report-zap.xml \${WORKSPACE}/report-zap.xml
+    						 
+                         """
+                    
+                 }
+             }
+          }  
+             
     
     stage('Send report to DefecDojo') {
         steps {
@@ -60,22 +109,16 @@ pipeline {
             sh "python3 upload-files.py --result_file /var/lib/jenkins/workspace/Pipeline-Sec/dependency-check-report.xml  --scanner 'Dependency Check Scan' --host 127.0.0.1:8080 --api_key d64dca4d31e577b7924ac6e0b8cc59f4b1526430  --name Namerepository"
             sh "sonar-report --sonarurl='http://192.168.100.115:9000'  --sonarcomponent='jskey' --project='jskey Project'  -sonartoken='02a034674a8cc59121f69d82c5f5b6d2ece15da7'  --sinceleakperiod='false' --fixMissingRule='true'  --noSecurityHotspot='true'  --allbugs='true' > sonar.html"         
             sh "python3 upload-files.py --result_file /var/lib/jenkins/workspace/Pipeline-Sec/sonar.html  --scanner 'SonarQube Scan' --host 127.0.0.1:8080 --api_key d64dca4d31e577b7924ac6e0b8cc59f4b1526430  --name Namerepository"
+            sh "python3 upload-files.py --result_file /var/lib/jenkins/workspace/Juice-Shop/report-zap.xml  --scanner 'ZAP Scan' --host 127.0.0.1:8080 --api_key d64dca4d31e577b7924ac6e0b8cc59f4b1526430  --name Namerepository"
+            sh "sudo docker stop owasp-scan"
+            sh "sudo docker rm owasp-scan"
+            sh "sudo docker stop sec-scan"
+            sh "sudo docker rm sec-scan"
+            
         } 
             
     }
-    //   stage('Subindo o container novo') {
-    //             steps {
-    //                 script {
-    //                     try {
-    //                         sh 'docker run -d -p 8989:8989 node-goof:latest'
-    //                     } catch (Exception e) {
-    //                         sh "echo $e"
-    //                         currentBuild.result = 'ABORTED'
-    //                         error('Erro')
-    //                 }
-    //             }
-    //         }
-    //     }
+    
   }
 
 }
