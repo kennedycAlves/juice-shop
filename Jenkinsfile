@@ -86,7 +86,8 @@ pipeline {
                             
                          sh 'sudo docker exec owasp-scan mkdir /zap/wrk'
                          
-						 sh """
+			 sh """
+			    sleep 1m
                             sudo docker exec owasp-scan zap-baseline.py \
                             -t http://192.168.100.115:3000/ \
                             -x report-zap.xml -I &&
