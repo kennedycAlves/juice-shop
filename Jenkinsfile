@@ -52,6 +52,21 @@ pipeline {
                 }
             }
         }
+    
+    stage('Down old containers') {
+        steps {
+            script {
+                try {
+                    sh """
+                        docker rm -f owasp-scan
+                        docker rm -f sec-scan
+                    """
+                } catch (Exception e) {
+                    sh "echo $e"
+                }
+            }
+        }
+    }   
         
     stage('Docker Build') {
       agent any
@@ -86,8 +101,8 @@ pipeline {
                             
                          sh 'sudo docker exec owasp-scan mkdir /zap/wrk'
                          
-			 sh """
-			    sleep 1m
+						 sh """
+						    sleep 1m
                             sudo docker exec owasp-scan zap-baseline.py \
                             -t http://192.168.100.115:3000/ \
                             -x report-zap.xml -I &&
@@ -104,17 +119,25 @@ pipeline {
     
     stage('Send report to DefecDojo') {
         steps {
+             script {
+                sh 'cp ../upload-files.py .'
+                sh 'chmod +x upload-files.py'
+                sh "python3 upload-files.py --result_file /var/lib/jenkins/workspace/Pipeline-Sec/dependency-check-report.xml  --scanner 'Dependency Check Scan' --host 127.0.0.1:8080 --api_key d64dca4d31e577b7924ac6e0b8cc59f4b1526430  --name Namerepository"
+                sh "sonar-report --sonarurl='http://192.168.100.115:9000'  --sonarcomponent='jskey' --project='jskey Project'  -sonartoken='02a034674a8cc59121f69d82c5f5b6d2ece15da7'  --sinceleakperiod='false' --fixMissingRule='true'  --noSecurityHotspot='true'  --allbugs='true' > sonar.html"         
+                sh "python3 upload-files.py --result_file /var/lib/jenkins/workspace/Pipeline-Sec/sonar.html  --scanner 'SonarQube Scan' --host 127.0.0.1:8080 --api_key d64dca4d31e577b7924ac6e0b8cc59f4b1526430  --name Namerepository"
+                sh "python3 upload-files.py --result_file /var/lib/jenkins/workspace/Juice-Shop/report-zap.xml  --scanner 'ZAP Scan' --host 127.0.0.1:8080 --api_key d64dca4d31e577b7924ac6e0b8cc59f4b1526430  --name Namerepository"
+ 
+            
            
-            sh 'cp ../upload-files.py .'
-            sh 'chmod +x upload-files.py'
-            sh "python3 upload-files.py --result_file /var/lib/jenkins/workspace/Pipeline-Sec/dependency-check-report.xml  --scanner 'Dependency Check Scan' --host 127.0.0.1:8080 --api_key d64dca4d31e577b7924ac6e0b8cc59f4b1526430  --name Namerepository"
-            sh "sonar-report --sonarurl='http://192.168.100.115:9000'  --sonarcomponent='jskey' --project='jskey Project'  -sonartoken='02a034674a8cc59121f69d82c5f5b6d2ece15da7'  --sinceleakperiod='false' --fixMissingRule='true'  --noSecurityHotspot='true'  --allbugs='true' > sonar.html"         
-            sh "python3 upload-files.py --result_file /var/lib/jenkins/workspace/Pipeline-Sec/sonar.html  --scanner 'SonarQube Scan' --host 127.0.0.1:8080 --api_key d64dca4d31e577b7924ac6e0b8cc59f4b1526430  --name Namerepository"
-            sh "python3 upload-files.py --result_file /var/lib/jenkins/workspace/Juice-Shop/report-zap.xml  --scanner 'ZAP Scan' --host 127.0.0.1:8080 --api_key d64dca4d31e577b7924ac6e0b8cc59f4b1526430  --name Namerepository"
-            sh "sudo docker stop owasp-scan"
-            sh "sudo docker rm owasp-scan"
-            sh "sudo docker stop sec-scan"
-            sh "sudo docker rm sec-scan"
+                try {
+                    sh """
+                        docker rm -f owasp-scan
+                        docker rm -f sec-scan
+                    """
+                } catch (Exception e) {
+                    sh "echo $e"
+                }
+            }
             
         } 
             
