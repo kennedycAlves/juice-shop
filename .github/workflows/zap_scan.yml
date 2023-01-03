@@ -1,8 +1,8 @@
 name: "ZAP Baseline Scan"
 
-on:
-  schedule:
-    - cron:  '0 18 * * 6'
+on: push
+#   schedule:
+#     - cron:  '0 18 * * 6'
 
 jobs:
   zap_scan:
